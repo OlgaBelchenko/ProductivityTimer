@@ -1,9 +1,12 @@
 package ru.olgabelchenko.productivitytimer
 
-import androidx.appcompat.app.AppCompatActivity
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
 import ru.olgabelchenko.productivitytimer.databinding.ActivityMainBinding
 import kotlin.concurrent.thread
 
@@ -11,8 +14,12 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var updateTime: Runnable
+    private lateinit var changeProgressBarColor: Runnable
     private val handler = Handler(Looper.getMainLooper())
-    private var isTimerRunning = false
+    private var time = 0
+
+    private var colorIndex = 0
+    private val colorList = listOf(Color.GREEN, Color.BLUE, Color.YELLOW, Color.MAGENTA)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -21,45 +28,42 @@ class MainActivity : AppCompatActivity() {
 
         with(binding) {
 
-            Runnable {
-                val currentText = textView.text
-
-                var (minutes, seconds) = currentText.split(":").map { it.toInt() }
-
-                if (seconds < 59) {
-                    seconds++
-                } else {
-                    minutes++
-                    seconds = 0
+            updateTime = object : Runnable {
+                override fun run() {
+                    time++
+                    textView.text = String.format("%02d:%02d", time / 60, time % 60)
+                    handler.postDelayed(this, 1000)
                 }
+            }
 
-                textView.text = String.format("%02d:%02d", minutes, seconds)
-            }.also { updateTime = it }
+            changeProgressBarColor = object : Runnable {
+                override fun run() {
+                    colorIndex = (colorIndex + 1) % colorList.size
+
+                    progressBar.indeterminateTintList =
+                        ColorStateList.valueOf(colorList[colorIndex])
+                    handler.postDelayed(this, 1000)
+                }
+            }
 
             startButton.setOnClickListener {
-
-                if (!isTimerRunning) {
-                    isTimerRunning = true
+                progressBar.visibility = View.VISIBLE
+                if (time == 0) {
                     thread {
-                        while (isTimerRunning) {
-                            handler.post(updateTime)
-                            Thread.sleep(1000)
-                        }
+                        handler.postDelayed(updateTime, 1000)
+                        handler.postDelayed(changeProgressBarColor, 1000)
                     }
                 }
             }
 
             resetButton.setOnClickListener {
-                isTimerRunning = false
+                handler.removeCallbacks(updateTime)
+                handler.removeCallbacks(changeProgressBarColor)
+                time = 0
+                colorIndex = 0
+                progressBar.visibility = View.INVISIBLE
                 textView.text = "00:00"
             }
-
         }
-
-    }
-
-    override fun onStop() {
-        super.onStop()
-        handler.removeCallbacks(updateTime)
     }
 }
